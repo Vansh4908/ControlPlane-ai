@@ -1,16 +1,27 @@
-from flask import Flask, jsonify
-from flask_cors import CORS
+from app import create_app
+from app.database.connection import db
+from app.models import (
+    Application,
+    Policy,
+    Evaluation,
+    EvaluationResult,
+    AuditLog,
+    Feedback,
+)
 
-app = Flask(__name__)
-CORS(app)
+app = create_app()
 
 
 @app.get("/health")
 def health():
-    return jsonify({
+    return {
         "status": "healthy",
         "service": "ControlPlane API"
-    })
+    }
+
+
+with app.app_context():
+    db.create_all()
 
 
 if __name__ == "__main__":

@@ -3,28 +3,29 @@ from datetime import datetime, timezone
 from app.database.connection import db
 
 
-class AuditLog(db.Model):
-    __tablename__ = "audit_logs"
+class Feedback(db.Model):
+    __tablename__ = "feedback"
 
     id = db.Column(db.Integer, primary_key=True)
 
     evaluation_id = db.Column(
         db.Integer,
         db.ForeignKey("evaluations.id"),
-        nullable=False
+        nullable=False,
+        unique=True
     )
 
-    action = db.Column(
+    user_action = db.Column(
         db.String(50),
         nullable=False
     )
 
-    actor = db.Column(
-        db.String(50),
-        nullable=False
+    correct_decision = db.Column(
+        db.String(30),
+        nullable=True
     )
 
-    reason = db.Column(
+    comment = db.Column(
         db.Text,
         nullable=True
     )
@@ -37,5 +38,5 @@ class AuditLog(db.Model):
 
     evaluation = db.relationship(
         "Evaluation",
-        back_populates="audit_logs"
+        back_populates="feedback"
     )

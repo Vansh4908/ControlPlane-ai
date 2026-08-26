@@ -16,6 +16,11 @@ __pycache__/
 venv/
 backend/.venv/
 
+# Local databases
+*.db
+instance/
+backend/instance/
+
 # Testing / coverage
 .pytest_cache/
 .coverage
