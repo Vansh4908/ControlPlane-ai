@@ -346,7 +346,7 @@ function EvaluationPage({ onBack }) {
 
         {result && (
           <section className="result-preview">
-            <div className="section-label">RESPONSE RECEIVED</div>
+            <div className="section-label">EVALUATION RESULT</div>
 
             <div className="result-card">
               <div className="result-label">TARGET AI RESPONSE</div>
@@ -355,9 +355,81 @@ function EvaluationPage({ onBack }) {
 
               <div className="result-meta">
                 <span>Evaluation #{result.id}</span>
-                <span>Pipeline connected</span>
+                <span>3 judges evaluated</span>
               </div>
             </div>
+
+            {result.consensus && (
+              <div className="consensus-card">
+                <div className="result-label">CONSENSUS</div>
+
+                <div className="consensus-grid">
+                  <div className="consensus-stat">
+                    <span>OVERALL RISK</span>
+                    <strong>
+                      {result.consensus.overall_risk.toFixed(2)}
+                    </strong>
+                  </div>
+        
+                  <div className="consensus-stat">
+                    <span>CONFIDENCE</span>
+                    <strong>
+                      {(result.consensus.confidence * 100).toFixed(0)}%
+                    </strong>
+                  </div>
+        
+                  <div className="consensus-stat">
+                    <span>RECOMMENDATION</span>
+                    <strong>
+                      {result.consensus.recommendation}
+                    </strong>
+                  </div>
+        
+                  <div className="consensus-stat">
+                    <span>JUDGES</span>
+                    <strong>
+                      {result.consensus.judge_count}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            )}
+        
+            {result.judge_results && (
+              <div className="judges-section">
+                <div className="result-label">JUDGE RESULTS</div>
+        
+                <div className="judge-list">
+                  {result.judge_results.map((judge) => (
+                    <div
+                      className="judge-card"
+                      key={judge.detector_name}
+                    >
+                      <div className="judge-header">
+                        <span className="judge-name">
+                          {judge.detector_name.replace("_", " ")}
+                        </span>
+        
+                        <span className="judge-recommendation">
+                          {judge.metadata.recommendation}
+                        </span>
+                      </div>
+        
+                      <div className="judge-score">
+                        Risk: {judge.score.toFixed(2)}
+                      </div>
+        
+                      <p>{judge.reason}</p>
+        
+                      <div className="judge-meta">
+                        Confidence:{" "}
+                        {(judge.confidence * 100).toFixed(0)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
@@ -365,15 +437,13 @@ function EvaluationPage({ onBack }) {
           <div className="section-label">EVALUATION PIPELINE</div>
 
           <div className="pipeline-row">
-            <span>Target AI</span>
+            <span>Groq Target</span>
             <ArrowRight size={16} />
-            <span>GPT Judge</span>
-            <span>Claude Judge</span>
-            <span>Gemini Judge</span>
+            <span>Safety</span>
+            <span>Truthfulness</span>
+            <span>Fairness / Privacy</span>
             <ArrowRight size={16} />
-            <span>Risk Engine</span>
-            <ArrowRight size={16} />
-            <strong>Decision</strong>
+            <strong>Consensus</strong>
           </div>
         </section>
       </main>

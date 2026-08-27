@@ -105,3 +105,5 @@ def assign_policy(application_id):
             "policy_id": application.policy_id
         }
     })
+
+
