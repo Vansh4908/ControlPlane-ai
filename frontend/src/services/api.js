@@ -32,3 +32,18 @@ export async function createEvaluation(payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function getReviewQueue() {
+  return request("/evaluations/review");
+}
+
+export async function submitHumanReview(evaluationId, payload) {
+  return request(`/evaluations/${evaluationId}/review`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getAuditLogs(evaluationId) {
+  return request(`/evaluations/${evaluationId}/audit`);
+}

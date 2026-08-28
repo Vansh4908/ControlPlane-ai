@@ -46,12 +46,38 @@ def create_application():
             "fields": missing_fields
         }), 400
 
+    policy_id = data.get("policy_id")
+
+    if policy_id:
+        policy = Policy.query.get(policy_id)
+    
+        if not policy:
+            return jsonify({
+                "error": "Policy not found"
+            }), 404
+    else:
+        policy = Policy.query.order_by(
+            Policy.created_at.asc()
+        ).first()
+    
+        if not policy:
+            policy = Policy(
+                name="Default Enterprise Policy",
+                description="Default governance policy for enterprise AI applications.",
+                pii_action="BLOCK",
+                hallucination_action="REVIEW",
+                bias_action="REVIEW"
+            )
+    
+            db.session.add(policy)
+            db.session.flush()
+
     application = Application(
         name=data["name"],
         description=data.get("description"),
         model_provider=data["model_provider"],
         model_name=data["model_name"],
-        policy_id=data.get("policy_id")
+        policy_id=policy.id
     )
 
     db.session.add(application)

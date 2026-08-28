@@ -1,5 +1,6 @@
-from flask import Blueprint, jsonify, request
+import time
 
+from flask import Blueprint, jsonify, request
 from app.database.connection import db
 from app.models.application import Application
 from app.models.evaluation import Evaluation , EvaluationResult
@@ -7,6 +8,9 @@ from app.services.llm.groq_service import GroqService
 from app.services.judge.gemini_judge import GeminiJudge
 from app.services.judge.judge_config import JUDGE_CONFIGS
 from app.engines.consensus_engine import ConsensusEngine
+from app.engines.risk_engine import RiskEngine
+from app.engines.policy_engine import PolicyEngine
+from app.models.audit_log import AuditLog
 
 
 evaluation_bp = Blueprint(
@@ -50,6 +54,8 @@ def create_evaluation():
             "error": f"Unsupported model provider: {application.model_provider}"
         }), 400
 
+    start_time = time.perf_counter()
+
     try:
         llm = GroqService()
         ai_response = llm.generate_response(prompt,application.model_name)
@@ -72,7 +78,7 @@ def create_evaluation():
     evaluation_results = []
     judge_results = []
 
-    for judge_config in JUDGE_CONFIGS:
+    for judge_config in JUDGE_CONFIGS[:1]:
         try:
             judge_result = judge.evaluate(
                 prompt,
@@ -113,6 +119,45 @@ def create_evaluation():
         judge_results
     )
 
+    risk_engine = RiskEngine()
+
+    risk_assessment = risk_engine.analyze(
+        judge_results,
+        consensus
+    )
+
+    policy_engine = PolicyEngine()
+
+    policy_decision = None
+
+    if application.policy :
+        policy_decision = policy_engine.decide(
+            risk_assessment,
+            application.policy
+        )
+
+    evaluation.overall_risk = risk_assessment["overall_risk"]
+    evaluation.confidence = risk_assessment["confidence"]
+
+    if policy_decision:
+        evaluation.final_decision = policy_decision["decision"]
+
+    evaluation.latency_ms = round(
+        (time.perf_counter() - start_time) * 1000
+    )
+
+    if policy_decision:
+        audit_log = AuditLog(
+            evaluation_id=evaluation.id,
+            action="POLICY_DECISION",
+            actor="SYSTEM",
+            reason=policy_decision["reason"]
+        )
+
+        db.session.add(audit_log)
+
+    db.session.commit()
+
     return jsonify({
         "message": "Evaluation created successfully",
         "evaluation": {
@@ -120,10 +165,16 @@ def create_evaluation():
             "application_id": evaluation.application_id,
             "prompt": evaluation.prompt,
             "ai_response": evaluation.ai_response,
-            "final_decision": evaluation.final_decision,
+            "final_decision": (
+                policy_decision["decision"]
+                if policy_decision
+                else None
+            ),
             "overall_risk": evaluation.overall_risk,
             "confidence": evaluation.confidence,
             "latency_ms": evaluation.latency_ms,
+            "risk": risk_assessment,
+            "policy_decision": policy_decision,
 
             "judge_results": [
             {
@@ -139,3 +190,4 @@ def create_evaluation():
             "consensus": consensus
         }
     }), 201
+

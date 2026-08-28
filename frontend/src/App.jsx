@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { getApplications, createEvaluation } from "./services/api";
+import {
+  getApplications,
+  createEvaluation,
+  getReviewQueue,
+  submitHumanReview,
+  getAuditLogs,
+} from "./services/api";
 import {
   ArrowRight,
   ShieldCheck,
@@ -19,10 +25,375 @@ function App() {
     );
   }
 
-  return <HomePage onEvaluate={() => setPage("evaluation")} />;
+  if (page === "review") {
+    return (
+      <ReviewPage onBack={() => setPage("home")} />
+    );
+  }
+
+  return (
+    <HomePage
+      onEvaluate={() => setPage("evaluation")}
+      onReview={() => setPage("review")}
+    />
+  );
 }
 
-function Navbar({ onEvaluate }) {
+function ReviewPage({ onBack }) {
+  const [reviews, setReviews] = useState([]);
+  const [selectedReview, setSelectedReview] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadReviews() {
+      try {
+        const data = await getReviewQueue();
+
+        setReviews(data.evaluations || []);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadReviews();
+  }, []);
+
+  async function selectReview(evaluation) {
+    setSelectedReview(evaluation);
+    setReason("");
+    setError("");
+
+    try {
+      const data = await getAuditLogs(evaluation.id);
+
+      setAuditLogs(data.audit_logs || []);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleReview(decision) {
+    if (!selectedReview || !reason.trim()) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+
+    try {
+      await submitHumanReview(selectedReview.id, {
+        decision,
+        reason,
+      });
+
+      const data = await getReviewQueue();
+
+      setReviews(data.evaluations || []);
+      setSelectedReview(null);
+      setAuditLogs([]);
+      setReason("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <nav className="navbar">
+        <div className="brand">
+          <div className="brand-mark">
+            <ShieldCheck size={21} />
+          </div>
+
+          <div>
+            <div className="brand-name">ControlPlane</div>
+            <div className="brand-subtitle">AI GOVERNANCE</div>
+          </div>
+        </div>
+
+        <button className="back-button" onClick={onBack}>
+          ← Back to overview
+        </button>
+      </nav>
+
+      <main className="evaluation-page">
+        <div className="evaluation-header">
+          <div className="hero-eyebrow">
+            <span className="eyebrow-line" />
+            HUMAN REVIEW
+          </div>
+
+          <h2>Review AI decisions</h2>
+
+          <p>
+            Review evaluations that ControlPlane has flagged
+            for human intervention.
+          </p>
+        </div>
+
+        {error && (
+          <div className="error-box">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="result-card">
+            Loading review queue...
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="result-card">
+            <div className="result-label">
+              REVIEW QUEUE
+            </div>
+
+            <p>
+              No evaluations are currently waiting for human review.
+            </p>
+          </div>
+        ) : (
+          <section className="result-preview">
+            <div className="section-label">
+              REVIEW QUEUE
+            </div>
+
+            <div className="judge-list">
+              {reviews.map((evaluation) => (
+                <button
+                  key={evaluation.id}
+                  className="judge-card"
+                  onClick={() => selectReview(evaluation)}
+                >
+                  <div className="judge-header">
+                    <span className="judge-name">
+                      Evaluation #{evaluation.id}
+                    </span>
+
+                    <span className="judge-recommendation">
+                      REVIEW
+                    </span>
+                  </div>
+
+                  <div className="judge-score">
+                    Risk:{" "}
+                    {evaluation.overall_risk !== null
+                      ? evaluation.overall_risk.toFixed(2)
+                      : "N/A"}
+                  </div>
+
+                  <p>
+                    {evaluation.prompt}
+                  </p>
+
+                  <div className="judge-meta">
+  Confidence:{" "}
+  {evaluation.confidence !== null
+    ? `${(
+        evaluation.confidence * 100
+      ).toFixed(0)}%`
+    : "N/A"}
+
+  {" · "}
+
+  Policy:{" "}
+  {evaluation.policy
+    ? evaluation.policy.name
+    : "No policy"}
+</div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {selectedReview && (
+          <section className="result-preview">
+            <div className="section-label">
+              SELECTED EVALUATION
+            </div>
+
+            <div className="result-card">
+  <div className="result-label">
+    EVALUATION CONTEXT
+  </div>
+
+  <div className="form-group">
+    <label>Original prompt</label>
+
+    <p>
+      {selectedReview.prompt}
+    </p>
+  </div>
+
+  <div className="form-group">
+    <label>AI response</label>
+
+    <p>
+      {selectedReview.ai_response}
+    </p>
+  </div>
+</div>
+
+            <div className="consensus-card">
+              <div className="result-label">
+                RISK INFORMATION
+              </div>
+
+              <div className="consensus-grid">
+                <div className="consensus-stat">
+                  <span>OVERALL RISK</span>
+                  <strong>
+                    {selectedReview.overall_risk !== null
+                      ? selectedReview.overall_risk.toFixed(2)
+                      : "N/A"}
+                  </strong>
+                </div>
+
+                <div className="consensus-stat">
+                  <span>CONFIDENCE</span>
+                  <strong>
+                    {selectedReview.confidence !== null
+                      ? `${(
+                          selectedReview.confidence * 100
+                        ).toFixed(0)}%`
+                      : "N/A"}
+                  </strong>
+                </div>
+
+                <div className="consensus-stat">
+                  <span>DECISION</span>
+                  <strong>
+                    {selectedReview.final_decision}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {selectedReview.policy && (
+  <div className="consensus-card">
+    <div className="result-label">
+      GOVERNANCE POLICY
+    </div>
+
+    <div className="consensus-grid">
+      <div className="consensus-stat">
+        <span>POLICY</span>
+        <strong>
+          {selectedReview.policy.name}
+        </strong>
+      </div>
+
+      <div className="consensus-stat">
+        <span>PII</span>
+        <strong>
+          {selectedReview.policy.pii_action}
+        </strong>
+      </div>
+
+      <div className="consensus-stat">
+        <span>HALLUCINATION</span>
+        <strong>
+          {selectedReview.policy.hallucination_action}
+        </strong>
+      </div>
+
+      <div className="consensus-stat">
+        <span>BIAS</span>
+        <strong>
+          {selectedReview.policy.bias_action}
+        </strong>
+      </div>
+    </div>
+  </div>
+)}
+
+            <div className="result-card">
+              <div className="result-label">
+                HUMAN REVIEW
+              </div>
+
+              <textarea
+                value={reason}
+                onChange={(event) =>
+                  setReason(event.target.value)
+                }
+                placeholder="Explain why you approve or reject this response..."
+                rows={5}
+              />
+
+              <div className="hero-actions">
+                <button
+                  className="primary-button"
+                  disabled={!reason.trim() || submitting}
+                  onClick={() => handleReview("APPROVE")}
+                >
+                  {submitting ? "Submitting..." : "Approve"}
+                </button>
+
+                <button
+                  className="secondary-button"
+                  disabled={!reason.trim() || submitting}
+                  onClick={() => handleReview("REJECT")}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+
+            <div className="result-card">
+              <div className="result-label">
+                AUDIT HISTORY
+              </div>
+
+              {auditLogs.length === 0 ? (
+                <p>
+                  No audit events recorded yet.
+                </p>
+              ) : (
+                <div className="judge-list">
+                  {auditLogs.map((log) => (
+                    <div
+                      className="judge-card"
+                      key={log.id}
+                    >
+                      <div className="judge-header">
+                        <span className="judge-name">
+                          {log.action}
+                        </span>
+
+                        <span className="judge-recommendation">
+                          {log.actor}
+                        </span>
+                      </div>
+
+                      <p>{log.reason}</p>
+
+                      <div className="judge-meta">
+                        {new Date(
+                          log.created_at
+                        ).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Navbar({ onEvaluate ,onReview }) {
   return (
     <nav className="navbar">
       <div className="brand">
@@ -42,7 +413,9 @@ function Navbar({ onEvaluate }) {
           Evaluate
         </button>
         <button className="nav-link">Policies</button>
-        <button className="nav-link">Audit Logs</button>
+        <button className="nav-link" onClick={onReview}>
+          Human Review
+        </button>
       </div>
 
       <div className="nav-status">
@@ -53,10 +426,13 @@ function Navbar({ onEvaluate }) {
   );
 }
 
-function HomePage({ onEvaluate }) {
+function HomePage({ onEvaluate, onReview  }) {
   return (
     <div className="app-shell">
-      <Navbar onEvaluate={onEvaluate} />
+      <Navbar
+        onEvaluate={onEvaluate}
+        onReview={onReview}
+      />
 
       <main>
         <section className="hero-section">
