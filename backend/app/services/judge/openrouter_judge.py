@@ -1,12 +1,12 @@
-from app.services.llm.gemini_service import GeminiService
+from app.services.llm.openrouter_service import OpenRouterService
 from app.services.llm.llm_judge import LLMJudge
 
 
-class GeminiJudge:
+class OpenRouterJudge:
 
     def __init__(self, model):
         self.judge = LLMJudge(
-            GeminiService(),
+            OpenRouterService(),
             model
         )
 

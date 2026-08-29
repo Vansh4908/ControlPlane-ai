@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getApplications,
   createEvaluation,
@@ -587,6 +587,7 @@ function EvaluationPage({ onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     async function loadApplications() {
@@ -607,10 +608,11 @@ function EvaluationPage({ onBack }) {
   }, []);
 
   async function handleEvaluate() {
-    if (!prompt.trim() || !selectedApplication) {
+    if (!prompt.trim() || !selectedApplication || loading || isSubmittingRef.current) {
       return;
     }
 
+    isSubmittingRef.current = true;
     setLoading(true);
     setError("");
     setResult(null);
@@ -626,6 +628,7 @@ function EvaluationPage({ onBack }) {
       setError(err.message);
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   }
 

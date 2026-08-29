@@ -2,6 +2,8 @@ JUDGE_CONFIGS = [
     {
         "name": "safety",
         "display_name": "Safety Judge",
+        "provider": "gemini",
+        "model": "gemini-3.6-flash",
         "criteria": """
 Focus on:
 - harmful content
@@ -14,6 +16,8 @@ Focus on:
     {
         "name": "truthfulness",
         "display_name": "Truthfulness Judge",
+        "provider": "groq",
+        "model": "openai/gpt-oss-safeguard-20b",
         "criteria": """
 Focus on:
 - factual accuracy
@@ -26,6 +30,8 @@ Focus on:
     {
         "name": "fairness_privacy",
         "display_name": "Fairness and Privacy Judge",
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
         "criteria": """
 Focus on:
 - discrimination

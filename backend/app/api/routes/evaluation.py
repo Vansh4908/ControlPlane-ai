@@ -1,16 +1,20 @@
 import time
 
+from concurrent.futures import ThreadPoolExecutor
+
 from flask import Blueprint, jsonify, request
 from app.database.connection import db
 from app.models.application import Application
 from app.models.evaluation import Evaluation , EvaluationResult
 from app.services.llm.groq_service import GroqService
-from app.services.judge.gemini_judge import GeminiJudge
+from app.services.judge.judge_factory import JudgeFactory
 from app.services.judge.judge_config import JUDGE_CONFIGS
 from app.engines.consensus_engine import ConsensusEngine
 from app.engines.risk_engine import RiskEngine
 from app.engines.policy_engine import PolicyEngine
 from app.models.audit_log import AuditLog
+from app.services.rag.retrieval_service import RetrievalService
+from app.services.pii.pii_detector import PIIDetector
 
 
 evaluation_bp = Blueprint(
@@ -59,6 +63,9 @@ def create_evaluation():
     try:
         llm = GroqService()
         ai_response = llm.generate_response(prompt,application.model_name)
+
+        pii_detector = PIIDetector()
+        pii_result = pii_detector.detect(ai_response)
     except Exception as exc:
         return jsonify({
             "error": "Failed to generate AI response",
@@ -71,28 +78,67 @@ def create_evaluation():
         ai_response=ai_response
     )
 
+    if pii_result["has_pii"]:
+        evaluation.has_pii = True
+        evaluation.pii_data = pii_result["detected_types"]
+
     db.session.add(evaluation)
     db.session.commit()
 
-    judge = GeminiJudge()
+
+    retrieval_service = RetrievalService()
+
+    retrieved_knowledge = retrieval_service.retrieve(
+        prompt,
+        top_k=3
+    )
+
+    def evaluate_judge(judge_config):
+        judge = JudgeFactory.create(
+            judge_config["provider"],
+            judge_config["model"]
+        )
+
+        context = None
+
+        if judge_config["name"] == "truthfulness":
+            context = "\n\n".join(
+                result["content"]
+                for result in retrieved_knowledge
+            )
+
+        res = judge.evaluate(
+            prompt,
+            ai_response,
+            judge_config["display_name"],
+            judge_config["criteria"],
+            context=context
+        )
+
+        return judge_config, res
+
+    results_by_name = {}
+    with ThreadPoolExecutor(max_workers=len(JUDGE_CONFIGS)) as executor:
+        futures = [
+            executor.submit(evaluate_judge, config)
+            for config in JUDGE_CONFIGS
+        ]
+        for future in futures:
+            try:
+                config, judge_result = future.result()
+                results_by_name[config["name"]] = (config, judge_result)
+            except Exception as exc:
+                return jsonify({
+                    "error": "Judge evaluation failed",
+                    "details": str(exc)
+                }), 502
+
     evaluation_results = []
     judge_results = []
 
-    for judge_config in JUDGE_CONFIGS[:1]:
-        try:
-            judge_result = judge.evaluate(
-                prompt,
-                ai_response,
-                judge_config["display_name"],
-                judge_config["criteria"]
-            )
-            judge_results.append(judge_result)
-        except Exception as exc:
-            return jsonify({
-                "error": "Judge evaluation failed",
-                "judge": judge_config["name"],
-                "details": str(exc)
-            }), 502
+    for judge_config in JUDGE_CONFIGS:
+        config, judge_result = results_by_name[judge_config["name"]]
+        judge_results.append(judge_result)
 
         evaluation_result = EvaluationResult(
             evaluation_id=evaluation.id,
@@ -123,7 +169,8 @@ def create_evaluation():
 
     risk_assessment = risk_engine.analyze(
         judge_results,
-        consensus
+        consensus,
+        pii_result
     )
 
     policy_engine = PolicyEngine()
@@ -187,7 +234,12 @@ def create_evaluation():
             }
             for result in evaluation_results
             ],
-            "consensus": consensus
+            "consensus": consensus,
+            "rag_evidence": retrieved_knowledge,
+            "pii": {
+                "detected": pii_result["has_pii"],
+                "detected_types": pii_result["detected_types"]
+            }
         }
     }), 201
 

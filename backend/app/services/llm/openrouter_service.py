@@ -3,14 +3,17 @@ from openai import OpenAI
 from app.config import Config
 
 
-class GroqService:
+class OpenRouterService:
+
     def __init__(self):
-        if not Config.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is not configured")
+        if not Config.OPENROUTER_API_KEY:
+            raise ValueError(
+                "OPENROUTER_API_KEY is not configured"
+            )
 
         self.client = OpenAI(
-            api_key=Config.GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1"
+            api_key=Config.OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1"
         )
 
     def generate_response(

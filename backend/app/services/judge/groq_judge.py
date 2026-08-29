@@ -1,13 +1,13 @@
-from app.services.llm.gemini_service import GeminiService
+from app.services.llm.groq_service import GroqService
 from app.services.llm.llm_judge import LLMJudge
 
 
-class GeminiJudge:
+class GroqJudge:
 
-    def __init__(self, model):
+    def __init__(self, model_name):
         self.judge = LLMJudge(
-            GeminiService(),
-            model
+            GroqService(),
+            model_name
         )
 
     def evaluate(
