@@ -11,6 +11,33 @@ applications_bp = Blueprint("applications", __name__, url_prefix="/api/applicati
 def get_application():
     applications = Application.query.order_by(Application.created_at.desc()).all()
 
+    # Filter or ensure at least one Groq application exists
+    groq_apps = [app for app in applications if app.model_provider.lower() == "groq"]
+
+    if not groq_apps:
+        policy = Policy.query.first()
+        if not policy:
+            policy = Policy(
+                name="Default Enterprise Policy",
+                description="Default governance policy for enterprise AI applications.",
+                pii_action="BLOCK",
+                hallucination_action="REVIEW",
+                bias_action="REVIEW"
+            )
+            db.session.add(policy)
+            db.session.flush()
+
+        default_app = Application(
+            name="Enterprise Customer Bot",
+            description="Default Groq target application",
+            model_provider="groq",
+            model_name="llama-3.1-8b-instant",
+            policy_id=policy.id
+        )
+        db.session.add(default_app)
+        db.session.commit()
+        applications = Application.query.order_by(Application.created_at.desc()).all()
+
     return jsonify([
         {
             "id": application.id,
@@ -22,6 +49,7 @@ def get_application():
             "created_at": application.created_at.isoformat(),
         }
         for application in applications
+        if application.model_provider.lower() == "groq"
     ])
 
 

@@ -49,31 +49,31 @@ class RiskEngine:
             raise ValueError(
                 "At least one judge result is required"
             )
-
+    
         # ---------------------------------------------------------
         # 1. LLM judge risk signals
         # ---------------------------------------------------------
-
+    
         safety_scores = [
             (result.overall_risk, result.confidence)
             for result in judge_results
         ]
-
+    
         hallucination_scores = [
             (result.hallucination_score, result.confidence)
             for result in judge_results
         ]
-
+    
         bias_scores = [
             (result.bias_score, result.confidence)
             for result in judge_results
         ]
-
+    
         privacy_scores = [
             (result.privacy_score, result.confidence)
             for result in judge_results
         ]
-
+    
         category_scores = {
             "safety": round(
                 self._weighted_average(safety_scores),
@@ -93,11 +93,11 @@ class RiskEngine:
             )
         }
 
-        # ---------------------------------------------------------
-        # 2. Deterministic PII signal
-        # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # 2. Deterministic PII signal
+    # ---------------------------------------------------------
 
-        pii_detected = (
+        pii_detected = bool(
             pii_result
             and pii_result.get("has_pii", False)
         )
@@ -108,9 +108,9 @@ class RiskEngine:
                 1.0
             )
 
-        # ---------------------------------------------------------
-        # 3. Identify dominant risk
-        # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # 3. Identify dominant risk
+    # ---------------------------------------------------------
 
         dominant_category = max(
             category_scores,
@@ -121,9 +121,9 @@ class RiskEngine:
             dominant_category
         ]
 
-        # ---------------------------------------------------------
-        # 4. Overall risk
-        # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # 4. Overall risk
+    # ---------------------------------------------------------
 
         overall_risk = max(
             consensus["overall_risk"],
@@ -135,9 +135,42 @@ class RiskEngine:
             4
         )
 
-        # ---------------------------------------------------------
-        # 5. Confidence
-        # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # 5. Judge recommendations
+    # ---------------------------------------------------------
+
+        judge_recommendations = [
+            result.recommendation.upper()
+            for result in judge_results
+            if result.recommendation
+        ]
+
+        judge_requires_review = (
+            "REVIEW" in judge_recommendations
+        )
+
+        judge_requires_block = (
+            "BLOCK" in judge_recommendations
+        )
+
+    # ---------------------------------------------------------
+    # 6. PII requires human review
+    # ---------------------------------------------------------
+
+        pii_requires_review = pii_detected
+
+    # ---------------------------------------------------------
+    # 7. Final governance requirement
+    # ---------------------------------------------------------
+
+        requires_review = (
+            judge_requires_review
+            or pii_requires_review
+            )
+
+    # ---------------------------------------------------------
+    # 8. Confidence
+    # ---------------------------------------------------------
 
         confidence = round(
             consensus["confidence"],
@@ -153,5 +186,16 @@ class RiskEngine:
             "category_scores": category_scores,
             "dominant_category": dominant_category,
             "dominant_score": dominant_score,
-            "pii_detected": bool(pii_detected)
+    
+            "pii_detected": pii_detected,
+    
+            "judge_recommendations": judge_recommendations,
+    
+            "requires_review": requires_review,
+    
+            "judge_requires_review": judge_requires_review,
+    
+            "pii_requires_review": pii_requires_review,
+    
+            "judge_requires_block": judge_requires_block
         }

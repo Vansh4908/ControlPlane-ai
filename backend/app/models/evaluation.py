@@ -6,7 +6,10 @@ from app.database.connection import db
 class Evaluation(db.Model):
     __tablename__ = "evaluations"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     application_id = db.Column(
         db.Integer,
@@ -14,8 +17,17 @@ class Evaluation(db.Model):
         nullable=False
     )
 
-    prompt = db.Column(db.Text, nullable=False)
-    ai_response = db.Column(db.Text, nullable=False)
+    prompt = db.Column(
+        db.Text,
+        nullable=False
+    )
+
+    # Original AI response is ALWAYS stored internally.
+    # It is only hidden from the user when final_decision == REVIEW/BLOCK.
+    ai_response = db.Column(
+        db.Text,
+        nullable=False
+    )
 
     final_decision = db.Column(
         db.String(30),
@@ -34,6 +46,36 @@ class Evaluation(db.Model):
 
     latency_ms = db.Column(
         db.Integer,
+        nullable=True
+    )
+
+    document_name = db.Column(
+        db.String(255),
+        nullable=True
+    )
+
+    document_content = db.Column(
+        db.Text,
+        nullable=True
+    )
+
+    edited_response = db.Column(
+        db.Text,
+        nullable=True
+    )
+
+    human_decision = db.Column(
+        db.String(30),
+        nullable=True
+    )
+
+    has_pii = db.Column(
+        db.Boolean,
+        default=False
+    )
+
+    pii_data = db.Column(
+        db.JSON,
         nullable=True
     )
 
@@ -67,10 +109,14 @@ class Evaluation(db.Model):
         uselist=False
     )
 
+
 class EvaluationResult(db.Model):
     __tablename__ = "evaluation_results"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     evaluation_id = db.Column(
         db.Integer,

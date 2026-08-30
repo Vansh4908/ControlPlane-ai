@@ -1,7 +1,7 @@
 from app.database.connection import db
 from app.models.knowledge_document import KnowledgeDocument
 from app.models.knowledge_chunk import KnowledgeChunk
-
+from app.services.rag.vector_store import VectorStore
 
 class DocumentService:
 
@@ -11,15 +11,19 @@ class DocumentService:
     def ingest_text(
         name,
         content,
-        description=None
+        description=None,
+        source_type="text"
     ):
+
         if not content or not content.strip():
-            raise ValueError("Document content cannot be empty")
+            raise ValueError(
+                "Document content cannot be empty"
+            )
 
         document = KnowledgeDocument(
             name=name,
             description=description,
-            source_type="text"
+            source_type=source_type
         )
 
         db.session.add(document)
@@ -32,6 +36,7 @@ class DocumentService:
             len(content),
             DocumentService.CHUNK_SIZE
         ):
+
             chunk_content = content[
                 index:index + DocumentService.CHUNK_SIZE
             ]
@@ -46,5 +51,8 @@ class DocumentService:
             chunks.append(chunk)
 
         db.session.commit()
+
+        vector_store = VectorStore()
+        vector_store.add_chunks(chunks)
 
         return document, chunks

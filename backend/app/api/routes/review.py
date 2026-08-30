@@ -22,12 +22,15 @@ def review_evaluation(evaluation_id):
             "error": "Request body is required"
         }), 400
 
-    decision = data.get("decision")
-    reason = data.get("reason")
+    decision = data.get("decision", "").upper()
+    reason = data.get("reason", "")
+    edited_response = data.get("edited_response")
 
-    if decision not in ["APPROVE", "REJECT"]:
+    allowed_decisions = ["APPROVE", "ALLOW", "REJECT", "BLOCK", "EDIT_ALLOW", "EDITED_ALLOW"]
+
+    if decision not in allowed_decisions:
         return jsonify({
-            "error": "decision must be APPROVE or REJECT"
+            "error": f"Invalid decision: {decision}. Must be APPROVE, REJECT, or EDIT_ALLOW"
         }), 400
 
     if not reason or not reason.strip():
@@ -47,24 +50,39 @@ def review_evaluation(evaluation_id):
             "error": "Evaluation is not awaiting human review"
         }), 400
 
-    # Convert human decision into final governance decision
-    final_decision = (
-        "ALLOW"
-        if decision == "APPROVE"
-        else "BLOCK"
-    )
+    if decision in ["EDIT_ALLOW", "EDITED_ALLOW"]:
+        if not edited_response or not edited_response.strip():
+            return jsonify({
+                "error": "edited_response is required when choosing Edit & Allow"
+            }), 400
+
+        evaluation.edited_response = edited_response.strip()
+        evaluation.ai_response = edited_response.strip()
+        final_decision = "ALLOW"
+        human_decision = "EDITED_ALLOW"
+        action_name = "HUMAN_REVIEW_EDITED_ALLOW"
+        log_reason = f"Human edited response and approved. Reason: {reason}"
+
+    elif decision in ["APPROVE", "ALLOW"]:
+        final_decision = "ALLOW"
+        human_decision = "ALLOW"
+        action_name = "HUMAN_REVIEW_ALLOW"
+        log_reason = f"Human approved response. Reason: {reason}"
+
+    else:
+        final_decision = "BLOCK"
+        human_decision = "REJECT"
+        action_name = "HUMAN_REVIEW_REJECT"
+        log_reason = f"Human rejected response. Reason: {reason}"
 
     evaluation.final_decision = final_decision
+    evaluation.human_decision = human_decision
 
     audit_log = AuditLog(
         evaluation_id=evaluation.id,
-        action="HUMAN_REVIEW",
+        action=action_name,
         actor="HUMAN",
-        reason=(
-            f"Human decision: {decision}. "
-            f"Decision changed from REVIEW to {final_decision}. "
-            f"Reason: {reason}"
-        )
+        reason=log_reason
     )
 
     db.session.add(audit_log)
@@ -74,14 +92,17 @@ def review_evaluation(evaluation_id):
         "message": "Human review completed",
         "evaluation": {
             "id": evaluation.id,
-            "final_decision": evaluation.final_decision
+            "final_decision": evaluation.final_decision,
+            "human_decision": evaluation.human_decision,
+            "ai_response": evaluation.ai_response
         },
         "review": {
-            "decision": decision,
+            "decision": human_decision,
             "reason": reason,
             "actor": "HUMAN"
         }
     }), 200
+
 
 @review_bp.get("/<int:evaluation_id>/audit")
 def get_audit_logs(evaluation_id):
@@ -113,6 +134,7 @@ def get_audit_logs(evaluation_id):
         ]
     }), 200
 
+
 @review_bp.get("/review")
 def get_review_queue():
 
@@ -127,13 +149,27 @@ def get_review_queue():
             {
                 "id": evaluation.id,
                 "application_id": evaluation.application_id,
+                "application_name": evaluation.application.name if evaluation.application else "N/A",
                 "prompt": evaluation.prompt,
                 "ai_response": evaluation.ai_response,
+                "document_name": evaluation.document_name,
+                "document_content": evaluation.document_content,
                 "final_decision": evaluation.final_decision,
                 "overall_risk": evaluation.overall_risk,
                 "confidence": evaluation.confidence,
                 "created_at": evaluation.created_at.isoformat(),
-
+                "has_pii": evaluation.has_pii,
+                "pii_data": evaluation.pii_data,
+                "judge_results": [
+                    {
+                        "detector_name": res.detector_name,
+                        "score": res.score,
+                        "confidence": res.confidence,
+                        "reason": res.reason,
+                        "metadata": res.metadata_json
+                    }
+                    for res in evaluation.results
+                ],
                 "policy": (
                     {
                         "id": evaluation.application.policy.id,
@@ -144,7 +180,7 @@ def get_review_queue():
                         ),
                         "bias_action": evaluation.application.policy.bias_action
                     }
-                    if evaluation.application.policy
+                    if evaluation.application and evaluation.application.policy
                     else None
                 )
             }

@@ -1,4 +1,5 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 async function request(endpoint, options = {}) {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -27,6 +28,18 @@ export async function getPolicies() {
 }
 
 export async function createEvaluation(payload) {
+  if (payload instanceof FormData) {
+    const response = await fetch(`${API_BASE_URL}/evaluations`, {
+      method: "POST",
+      body: payload,
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to submit evaluation");
+    }
+    return data;
+  }
+
   return request("/evaluations", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -46,4 +59,8 @@ export async function submitHumanReview(evaluationId, payload) {
 
 export async function getAuditLogs(evaluationId) {
   return request(`/evaluations/${evaluationId}/audit`);
+}
+
+export async function getEvaluationHistory() {
+  return request("/evaluations/history");
 }

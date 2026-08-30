@@ -37,6 +37,7 @@ class VectorStore:
         metadatas = [
             {
                 "document_id": chunk.document_id,
+                "document_name": chunk.document.name,
                 "chunk_index": chunk.chunk_index
             }
             for chunk in chunks
@@ -57,5 +58,10 @@ class VectorStore:
 
         return self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=top_k
+            n_results=top_k,
+            include=[
+                "documents",
+                "metadatas",
+                "distances"
+            ]
         )
