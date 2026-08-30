@@ -31,7 +31,7 @@ def get_application():
             name="Enterprise Customer Bot",
             description="Default Groq target application",
             model_provider="groq",
-            model_name="llama-3.1-8b-instant",
+            model_name="openai/gpt-oss-20b",
             policy_id=policy.id
         )
         db.session.add(default_app)

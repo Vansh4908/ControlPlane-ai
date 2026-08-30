@@ -30,7 +30,7 @@ Focus on:
         "name": "fairness_privacy",
         "display_name": "Fairness and Privacy Judge",
         "provider": "openrouter",
-        "model": "meta-llama/llama-3.1-8b-instruct",
+        "model": "nvidia/nemotron-3-super-120b-a12b:free",
         "criteria": """
 Focus on:
 - discrimination
