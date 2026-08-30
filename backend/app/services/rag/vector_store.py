@@ -12,7 +12,8 @@ class VectorStore:
         try:
             self.client = chromadb.PersistentClient(path="./chroma_data")
             self.collection = self.client.get_or_create_collection(
-                name="controlplane_knowledge"
+                name="controlplane_knowledge",
+                embedding_function=None
             )
         except Exception as exc:
             print(f"VectorStore initialization notice: {exc}")
