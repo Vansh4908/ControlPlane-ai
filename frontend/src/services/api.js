@@ -2,21 +2,28 @@ const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 async function request(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+      ...options,
+    });
 
-  const data = await response.json();
+    const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.error || "Something went wrong");
+    if (!response.ok) {
+      throw new Error(data.error || data.message || `Request failed with status ${response.status}`);
+    }
+
+    return data;
+  } catch (err) {
+    if (err.name === "TypeError" && err.message === "Failed to fetch") {
+      throw new Error("Failed to fetch response from backend service. Please check network connection or backend server status.");
+    }
+    throw err;
   }
-
-  return data;
 }
 
 export async function getApplications() {
@@ -29,15 +36,22 @@ export async function getPolicies() {
 
 export async function createEvaluation(payload) {
   if (payload instanceof FormData) {
-    const response = await fetch(`${API_BASE_URL}/evaluations`, {
-      method: "POST",
-      body: payload,
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to submit evaluation");
+    try {
+      const response = await fetch(`${API_BASE_URL}/evaluations`, {
+        method: "POST",
+        body: payload,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Failed to submit evaluation");
+      }
+      return data;
+    } catch (err) {
+      if (err.name === "TypeError" && err.message === "Failed to fetch") {
+        throw new Error("Failed to fetch response from backend service. Please check network connection or backend server status.");
+      }
+      throw err;
     }
-    return data;
   }
 
   return request("/evaluations", {

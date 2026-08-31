@@ -10,7 +10,8 @@ class GroqService:
 
         self.client = OpenAI(
             api_key=Config.GROQ_API_KEY,
-            base_url="https://api.groq.com/openai/v1"
+            base_url="https://api.groq.com/openai/v1",
+            timeout=12.0
         )
 
     def generate_response(
@@ -29,5 +30,8 @@ class GroqService:
             ],
             response_format=response_format
         )
+
+        if not response or not getattr(response, "choices", None):
+            return None
 
         return response.choices[0].message.content

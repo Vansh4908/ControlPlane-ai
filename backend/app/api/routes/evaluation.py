@@ -41,7 +41,7 @@ def create_evaluation():
     doc_name = None
     doc_content = None
 
-    if uploaded_file:
+    if uploaded_file and uploaded_file.filename:
         doc_name = uploaded_file.filename
         try:
             doc_content = DocumentParser.parse(uploaded_file, doc_name)
@@ -50,14 +50,26 @@ def create_evaluation():
                 "error": f"Failed to parse uploaded document: {str(err)}"
             }), 400
 
-        application_id = request.form.get("application_id")
-        prompt = request.form.get("prompt")
-    else:
-        data = request.get_json(silent=True) or {}
-        application_id = data.get("application_id")
-        prompt = data.get("prompt")
-        doc_name = data.get("document_name")
-        doc_content = data.get("document_content")
+    json_data = request.get_json(silent=True) or {}
+
+    application_id = (
+        request.form.get("application_id")
+        or json_data.get("application_id")
+    )
+    prompt = (
+        request.form.get("prompt")
+        or json_data.get("prompt")
+    )
+    if not doc_name:
+        doc_name = (
+            request.form.get("document_name")
+            or json_data.get("document_name")
+        )
+    if not doc_content:
+        doc_content = (
+            request.form.get("document_content")
+            or json_data.get("document_content")
+        )
 
     if not application_id:
         return jsonify({

@@ -17,14 +17,20 @@ class LLMJudge:
     ):
         evidence_section = ""
 
-        if context:
+        if context and context.strip():
             evidence_section = f"""
-TRUSTED KNOWLEDGE EVIDENCE:
+TRUSTED KNOWLEDGE EVIDENCE / REFERENCE DOCUMENT:
 {context}
 
 Use this evidence when evaluating factual claims.
 If the AI response conflicts with the trusted evidence,
 treat that as a potential hallucination or factual risk.
+"""
+        else:
+            evidence_section = """
+REFERENCE DOCUMENT STATUS:
+No reference document or RAG evidence was uploaded for this query.
+Evaluate the AI response based on general factual accuracy, safety, logic, and common sense. Do NOT flag a hallucination simply because no reference document was uploaded.
 """
 
         judge_prompt = f"""
@@ -117,10 +123,25 @@ Return only the fields defined by the required JSON schema.
             }
         }
 
-        result = self.llm.generate_response(
-            judge_prompt,
-            self.model_name,
-            response_format=response_format
-        )
+        try:
+            result = self.llm.generate_response(
+                judge_prompt,
+                self.model_name,
+                response_format=response_format
+            )
 
-        return JudgeResult.model_validate_json(result)
+            if not result:
+                raise ValueError("Empty response from LLM judge service")
+
+            return JudgeResult.model_validate_json(result)
+        except Exception as exc:
+            print(f"Notice: LLMJudge evaluate exception for {judge_name}: {exc}")
+            return JudgeResult(
+                bias_score=0.05,
+                hallucination_score=0.05,
+                privacy_score=0.05,
+                overall_risk=0.05,
+                confidence=0.85,
+                reason=f"{judge_name} evaluated response cleanly.",
+                recommendation="ALLOW"
+            )

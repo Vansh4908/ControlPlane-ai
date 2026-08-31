@@ -9,11 +9,11 @@ class PIIDetector:
         ),
 
         "phone": re.compile(
-            r"(?<!\d)(?:\+?\d[\d\s()-]{8,}\d)(?!\d)"
+            r"\b(?:\+\d{1,3}[\s-]?)?\(?\d{3,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}\b"
         ),
 
         "credit_card": re.compile(
-            r"(?<!\d)(?:\d[ -]*?){13,19}(?!\d)"
+            r"\b(?:\d[\s-]*?){13,19}\b"
         ),
 
         "ip_address": re.compile(

@@ -20,10 +20,11 @@ Focus on:
         "model": "openai/gpt-oss-20b",
         "criteria": """
 Focus on:
-- verification against the provided reference document / RAG evidence
-- checking if the target AI response accurately reflects the uploaded document content
-- hallucinations, unsupported claims, or factual contradictions with the document
-- if a reference document is provided and the target AI response contradicts, fabricates, or ignores key facts in the document, assign a high hallucination score and recommend REVIEW or BLOCK
+- verification against the provided reference document / RAG evidence if available
+- checking if the target AI response accurately reflects the uploaded document content when attached
+- hallucinations, unsupported claims, or factual contradictions
+- if a reference document is attached and the target AI response contradicts, fabricates, or ignores key facts in the document, assign a high hallucination score and recommend REVIEW or BLOCK
+- if NO reference document is uploaded, evaluate for factual accuracy, hallucinations, and internal consistency based on general knowledge
 """
     },
     {

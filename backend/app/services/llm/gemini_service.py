@@ -25,4 +25,7 @@ class GeminiService:
             response_format=response_format
         )
 
+        if not response or not getattr(response, "choices", None):
+            return None
+
         return response.choices[0].message.content
